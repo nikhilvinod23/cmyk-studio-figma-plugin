@@ -1,0 +1,12 @@
+{
+  "name": "CMYK Studio",
+  "id": "1679627741197023506",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["none"]
+  },
+  "editorType": ["figma"]
+}

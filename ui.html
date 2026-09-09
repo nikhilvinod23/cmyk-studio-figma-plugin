@@ -1,0 +1,253 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        --bg: #ffffff;
+        --panel: #f4f4f5;
+        --text: #1f1f22;
+        --muted: #74747d;
+        --border: #dedee3;
+        --accent: #7c5cff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #242427; --panel: #303035; --text: #f4f4f5; --muted: #a7a7b0; --border: #494950; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 20px; color: var(--text); background: var(--bg); font-size: 12px; }
+      h1 { margin: 0 0 4px; font-size: 18px; letter-spacing: -0.02em; }
+      .subtitle { color: var(--muted); margin-bottom: 18px; }
+      label { display: block; color: var(--muted); font-size: 11px; font-weight: 600; margin-bottom: 6px; }
+      select, input[type="number"] { width: 100%; height: 32px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); padding: 0 9px; }
+      select { margin-bottom: 14px; }
+      .wheel-wrap { display: flex; justify-content: center; margin: 4px 0 12px; }
+      canvas { width: 238px; height: 238px; border-radius: 50%; cursor: crosshair; box-shadow: 0 0 0 1px var(--border); }
+      .lightness { display: grid; grid-template-columns: 64px 1fr 42px; align-items: center; gap: 8px; margin-bottom: 16px; }
+      .lightness label { margin: 0; }
+      output { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+      input[type="range"] { width: 100%; accent-color: var(--accent); }
+      .preview-row { display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 10px; margin-bottom: 16px; }
+      .source-row { display: grid; grid-template-columns: 1fr 76px; gap: 8px; margin-bottom: 4px; }
+      #preview { width: 42px; height: 42px; border-radius: 9px; border: 1px solid var(--border); background: #fff; }
+      #recipe { font-weight: 700; font-variant-numeric: tabular-nums; }
+      #status { color: var(--muted); margin-top: 3px; line-height: 1.35; }
+      .channel { display: grid; grid-template-columns: 16px 1fr 48px; gap: 8px; align-items: center; margin: 9px 0; }
+      .channel b { font-size: 11px; }
+      .channel input[type="number"] { text-align: right; padding: 0 6px; }
+      .c b { color: #16a7d8; } .m b { color: #d92d85; } .y b { color: #c89500; } .k b { color: #777; }
+      .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
+      .tools { display: grid; gap: 8px; margin-top: 10px; }
+      button { height: 34px; border: 0; border-radius: 7px; font-weight: 700; cursor: pointer; color: var(--text); background: var(--panel); }
+      button.primary { color: #fff; background: var(--accent); }
+      button:hover { filter: brightness(0.96); }
+      .selection { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); color: var(--muted); }
+      #selection { margin-top: 4px; color: var(--text); }
+      .hint { margin-top: 12px; color: var(--muted); line-height: 1.4; }
+    </style>
+  </head>
+  <body>
+    <h1>CMYK Studio</h1>
+    <div class="subtitle">Choose printable colors visually or by ink recipe.</div>
+
+    <label for="preview-mode">Color preview</label>
+    <select id="preview-mode">
+      <option value="print">Print simulation (recommended)</option>
+      <option value="screen">Screen/RGB preview</option>
+    </select>
+
+    <div class="wheel-wrap"><canvas id="wheel" width="476" height="476" aria-label="CMYK color wheel"></canvas></div>
+
+    <div class="lightness">
+      <label for="lightness">Lightness</label>
+      <input id="lightness" type="range" min="8" max="96" value="58" />
+      <output id="lightness-value">58%</output>
+    </div>
+
+    <div class="preview-row">
+      <div id="preview"></div>
+      <div><div id="recipe">C0 M0 Y0 K0</div><div id="status">No layers selected.</div></div>
+    </div>
+
+    <label for="source-color">Sampled color from Figma</label>
+    <div class="source-row">
+      <input id="source-color" type="text" placeholder="#RRGGBB or rgb(255, 0, 0)" autocomplete="off" />
+      <button id="use-source">Use color</button>
+    </div>
+    <div class="hint">Use Figma’s native eyedropper to copy a color, then paste it here. This works with image pixels and strokes.</div>
+
+    <div class="channel c"><b>C</b><input id="c-range" type="range" min="0" max="100" value="0" /><input id="c-number" type="number" min="0" max="100" value="0" /></div>
+    <div class="channel m"><b>M</b><input id="m-range" type="range" min="0" max="100" value="0" /><input id="m-number" type="number" min="0" max="100" value="0" /></div>
+    <div class="channel y"><b>Y</b><input id="y-range" type="range" min="0" max="100" value="0" /><input id="y-number" type="number" min="0" max="100" value="0" /></div>
+    <div class="channel k"><b>K</b><input id="k-range" type="range" min="0" max="100" value="0" /><input id="k-number" type="number" min="0" max="100" value="0" /></div>
+
+    <div class="lightness">
+      <label for="alpha">Opacity</label>
+      <input id="alpha" type="range" min="0" max="100" value="100" />
+      <output id="alpha-value">100%</output>
+    </div>
+
+    <div class="actions">
+      <button class="primary" data-target="fill">Apply fill</button>
+      <button data-target="stroke">Apply stroke</button>
+    </div>
+
+    <div class="tools">
+      <button id="convert-selection">Convert selected objects to CMYK</button>
+    </div>
+    <div id="tool-status" class="hint">Conversion includes selected layers and their descendants. Images and effects are left unchanged.</div>
+
+    <div class="selection"><b>Selection</b><div id="selection">Select one or more layers in Figma.</div></div>
+    <div class="hint">Figma receives an RGB preview, while the CMYK recipe is preserved on each edited layer. Use a printer-supplied ICC profile for production color conversion.</div>
+
+    <script>
+      const wheel = document.getElementById('wheel');
+      const ctx = wheel.getContext('2d');
+      const state = { c: 0, m: 0, y: 0, k: 0, lightness: 58, alpha: 100, hue: 0, saturation: 0, previewMode: 'print' };
+      const channels = ['c', 'm', 'y', 'k'];
+
+      const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+      const cmykToRgb = (c, m, y, k) => ({ r: (1-c)*(1-k), g: (1-m)*(1-k), b: (1-y)*(1-k) });
+      function printPreview(c, m, y, k) {
+        const dotGain = (ink) => clamp(ink + 0.14 * ink * (1 - ink), 0, 1);
+        const raw = { r: (1-dotGain(c))*(1-dotGain(k))*0.965, g: (1-dotGain(m))*(1-dotGain(k))*0.96, b: (1-dotGain(y))*(1-dotGain(k))*0.935 };
+        const luminance = 0.2126*raw.r + 0.7152*raw.g + 0.0722*raw.b, soften = 0.12;
+        return { r: clamp(Math.pow(luminance+(raw.r-luminance)*(1-soften),1.04),0,1), g: clamp(Math.pow(luminance+(raw.g-luminance)*(1-soften),1.04),0,1), b: clamp(Math.pow(luminance+(raw.b-luminance)*(1-soften),1.04),0,1) };
+      }
+      const rgbToCmyk = ({ r, g, b }) => {
+        r /= 255; g /= 255; b /= 255;
+        const k = 1 - Math.max(r, g, b);
+        if (k > 0.999) return { c: 0, m: 0, y: 0, k: 100 };
+        return { c: 100 * (1 - r - k) / (1 - k), m: 100 * (1 - g - k) / (1 - k), y: 100 * (1 - b - k) / (1 - k), k: 100 * k };
+      };
+      function rgbToHsl({ r, g, b }) {
+        r /= 255; g /= 255; b /= 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+        let h = 0, s = 0, l = (max + min) / 2;
+        if (d) {
+          s = d / (1 - Math.abs(2*l - 1));
+          switch (max) {
+            case r: h = 60 * (((g-b)/d) % 6); break;
+            case g: h = 60 * ((b-r)/d + 2); break;
+            default: h = 60 * ((r-g)/d + 4);
+          }
+          if (h < 0) h += 360;
+        }
+        return { h, s: s*100, l: l*100 };
+      }
+      function parseColor(value) {
+        const input = value.trim();
+        const hexMatch = input.match(/^#?([0-9a-f]{3,8})$/i);
+        if (hexMatch) {
+          let hex = hexMatch[1];
+          if (hex.length === 3 || hex.length === 4) hex = hex.split('').map(ch => ch + ch).join('');
+          const hasAlpha = hex.length === 8;
+          return { r: parseInt(hex.slice(0,2),16), g: parseInt(hex.slice(2,4),16), b: parseInt(hex.slice(4,6),16), alpha: hasAlpha ? parseInt(hex.slice(6,8),16)/255 : null };
+        }
+        const match = input.match(/^rgba?\((.+)\)$/i);
+        if (match) {
+          const parts = match[1].replace(/\//g, ' ').replace(/,/g, ' ').trim().split(/\s+/);
+          if (parts.length >= 3) {
+            const channel = (part) => part.endsWith('%') ? clamp(parseFloat(part) * 2.55, 0, 255) : clamp(parseFloat(part), 0, 255);
+            const alpha = parts[3] == null ? null : clamp(parts[3].endsWith('%') ? parseFloat(parts[3])/100 : parseFloat(parts[3]), 0, 1);
+            return { r: channel(parts[0]), g: channel(parts[1]), b: channel(parts[2]), alpha };
+          }
+        }
+        return null;
+      }
+      function hslToRgb(h, s, l) {
+        h /= 360; s /= 100; l /= 100;
+        const hue = (p, q, t) => { if (t < 0) t += 1; if (t > 1) t -= 1; if (t < 1/6) return p + (q-p)*6*t; if (t < 1/2) return q; if (t < 2/3) return p + (q-p)*(2/3-t)*6; return p; };
+        if (!s) return { r: l*255, g: l*255, b: l*255 };
+        const q = l < .5 ? l*(1+s) : l+s-l*s, p = 2*l-q;
+        return { r: hue(p,q,h+1/3)*255, g: hue(p,q,h)*255, b: hue(p,q,h-1/3)*255 };
+      }
+      function rgbCss(rgb) { return `rgb(${Math.round(rgb.r)}, ${Math.round(rgb.g)}, ${Math.round(rgb.b)})`; }
+      function currentRgb() {
+        const rgb = cmykToRgb(state.c/100, state.m/100, state.y/100, state.k/100);
+        return state.previewMode === 'screen' ? { r: Math.round(rgb.r*255), g: Math.round(rgb.g*255), b: Math.round(rgb.b*255) } : (() => { const proof = printPreview(state.c/100,state.m/100,state.y/100,state.k/100); return { r: Math.round(proof.r*255), g: Math.round(proof.g*255), b: Math.round(proof.b*255) }; })();
+      }
+
+      function drawWheel() {
+        const size = wheel.width, center = size / 2, radius = size / 2 - 8;
+        const image = ctx.createImageData(size, size);
+        for (let py = 0; py < size; py++) for (let px = 0; px < size; px++) {
+          const dx = px - center, dy = py - center, dist = Math.sqrt(dx*dx + dy*dy);
+          const i = (py * size + px) * 4;
+          if (dist > radius) { image.data[i+3] = 0; continue; }
+          const hue = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+          const sat = clamp(dist / radius, 0, 1) * 100;
+          const rgb = hslToRgb(hue, sat, state.lightness);
+          image.data[i] = rgb.r; image.data[i+1] = rgb.g; image.data[i+2] = rgb.b; image.data[i+3] = 255;
+        }
+        ctx.putImageData(image, 0, 0);
+        const angle = state.hue * Math.PI / 180, r = state.saturation / 100 * radius;
+        ctx.beginPath(); ctx.arc(center + Math.cos(angle)*r, center + Math.sin(angle)*r, 10, 0, Math.PI*2);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.stroke(); ctx.strokeStyle = '#222'; ctx.lineWidth = 2; ctx.stroke();
+      }
+
+      function updateUi() {
+        channels.forEach((name) => { document.getElementById(`${name}-range`).value = state[name]; document.getElementById(`${name}-number`).value = Math.round(state[name]); });
+        document.getElementById('lightness').value = state.lightness; document.getElementById('lightness-value').textContent = `${state.lightness}%`;
+        document.getElementById('alpha').value = state.alpha; document.getElementById('alpha-value').textContent = `${state.alpha}%`;
+        const rgb = currentRgb(); document.getElementById('preview').style.background = rgbCss(rgb);
+        document.getElementById('recipe').textContent = `C${Math.round(state.c)} M${Math.round(state.m)} Y${Math.round(state.y)} K${Math.round(state.k)}`;
+        drawWheel();
+      }
+
+      function setFromWheel(event) {
+        const rect = wheel.getBoundingClientRect(), x = (event.clientX - rect.left) * wheel.width / rect.width - wheel.width/2, y = (event.clientY - rect.top) * wheel.height / rect.height - wheel.height/2;
+        const radius = wheel.width/2 - 8, distance = Math.min(radius, Math.sqrt(x*x+y*y));
+        state.hue = (Math.atan2(y, x)*180/Math.PI+360)%360; state.saturation = distance/radius*100;
+        const rgb = hslToRgb(state.hue, state.saturation, state.lightness); const cmyk = rgbToCmyk(rgb);
+        Object.assign(state, cmyk); updateUi();
+      }
+      let dragging = false;
+      wheel.addEventListener('pointerdown', (event) => { dragging = true; wheel.setPointerCapture(event.pointerId); setFromWheel(event); });
+      wheel.addEventListener('pointermove', (event) => { if (dragging) setFromWheel(event); });
+      wheel.addEventListener('pointerup', () => dragging = false);
+      channels.forEach((name) => {
+        ['range', 'number'].forEach((kind) => document.getElementById(`${name}-${kind}`).addEventListener('input', (event) => { state[name] = clamp(Number(event.target.value) || 0, 0, 100); updateUi(); }));
+      });
+      document.getElementById('lightness').addEventListener('input', (event) => { state.lightness = Number(event.target.value); updateUi(); });
+      document.getElementById('alpha').addEventListener('input', (event) => { state.alpha = Number(event.target.value); updateUi(); });
+      document.getElementById('preview-mode').addEventListener('change', (event) => { state.previewMode = event.target.value; updateUi(); });
+      function useSourceColor() {
+        const parsed = parseColor(document.getElementById('source-color').value);
+        if (!parsed || [parsed.r, parsed.g, parsed.b].some(Number.isNaN)) {
+          document.getElementById('tool-status').textContent = 'Enter a copied Hex value such as #FF3366 or an RGB value such as rgb(255, 51, 102).';
+          return;
+        }
+        const cmyk = rgbToCmyk(parsed);
+        const hsl = rgbToHsl(parsed);
+        Object.assign(state, { c: cmyk.c, m: cmyk.m, y: cmyk.y, k: cmyk.k, hue: hsl.h, saturation: hsl.s, lightness: clamp(hsl.l, 8, 96) });
+        if (parsed.alpha !== null) state.alpha = parsed.alpha * 100;
+        document.getElementById('tool-status').textContent = 'Sampled color converted to the closest CMYK recipe. Choose Apply fill or Apply stroke.';
+        updateUi();
+      }
+      document.getElementById('use-source').addEventListener('click', useSourceColor);
+      document.getElementById('source-color').addEventListener('keydown', (event) => { if (event.key === 'Enter') useSourceColor(); });
+      function messageColor() { return { c: state.c/100, m: state.m/100, y: state.y/100, k: state.k/100 }; }
+      document.querySelectorAll('[data-target]').forEach((button) => button.addEventListener('click', () => parent.postMessage({ pluginMessage: { type: 'apply', target: button.dataset.target, previewMode: state.previewMode, alpha: state.alpha/100, cmyk: messageColor() } }, '*')));
+      document.getElementById('convert-selection').addEventListener('click', () => parent.postMessage({ pluginMessage: { type: 'convert-selection', previewMode: state.previewMode } }, '*'));
+
+      window.onmessage = (event) => {
+        const message = event.data.pluginMessage;
+        if (!message) return;
+        if (message.type === 'conversion-result') {
+          document.getElementById('tool-status').textContent = `Converted ${message.converted} layer${message.converted === 1 ? '' : 's'}${message.preserved ? `; preserved ${message.preserved} existing CMYK recipe${message.preserved === 1 ? '' : 's'}` : ''}${message.unsupported ? `; skipped ${message.unsupported} image/effect paint${message.unsupported === 1 ? '' : 's'}` : ''}.`;
+          return;
+        }
+        if (message.type !== 'selection') return;
+        const selected = message.selection;
+        document.getElementById('status').textContent = selected.length ? `${selected.length} layer${selected.length === 1 ? '' : 's'} selected.` : 'No layers selected.';
+        document.getElementById('selection').textContent = selected.length ? selected.map((item) => item.name).join(', ') : 'Select one or more layers in Figma.';
+        const first = selected[0] && selected[0].cmyk;
+        if (first) { state.c = first.c; state.m = first.m; state.y = first.y; state.k = first.k; if (first.preview) { state.previewMode = first.preview; document.getElementById('preview-mode').value = first.preview; } updateUi(); }
+      };
+      updateUi();
+    </script>
+  </body>
+</html>
